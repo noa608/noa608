@@ -213,6 +213,7 @@
         .code-slots {
             display: flex;
             gap: 10px;
+            direction: ltr;
         }
         .slot {
             width: 55px;
@@ -310,6 +311,7 @@ let soundOn = true;
 function playTone(freq, type = 'sine', dur = 0.1, vol = 0.1) {
     if (!soundOn) return;
     if (!actx) actx = new AudioCtx();
+    if (actx.state === 'suspended') actx.resume();
     const osc = actx.createOscillator();
     const gain = actx.createGain();
     osc.type = type;
@@ -328,6 +330,761 @@ function toggleSound() {
     if (soundOn) playTone(520, 'triangle', 0.1);
 }
 
-let totalScore = parseInt(localStorage.getItem('arc_score') || '0');
-document.getElementById('scoreVal').innerText = totalScore;
 
+function initEscape(stage) {
+    const symbols = ['🌙', '🔥', '💧', '⚡', '🍀', '💎'];
+    const secret = [
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)]
+    ];
+    let guess =;
+    let hasKey = false;
+
+    stage.innerHTML = `
+        <div class="room" id="escRoom">
+            <div class="room-item" style="top:40px; left:35px;" id="picItem">🖼️</div>
+            <div class="room-item" style="top:35px; right:40px;" id="clockItem">🕰️</div>
+            <div class="room-item" style="bottom:115px; left:140px; font-size:4.5rem;" id="doorItem">🚪</div>
+            <div class="room-item" style="bottom:45px; left:35px;" id="plantItem">🪴</div>
+            <div class="room-item" style="bottom:45px; right:40px;" id="chestItem">🧰</div>
+            <div class="clue-bubble" id="clueBox"></div>
+            <div class="keypad" id="keypad">
+                <div style="font-size:2.5rem;">🔒</div>
+                <div class="code-slots">
+                    <div class="slot" id="s0">${symbols[0]}</div>
+                    <div class="slot" id="s1">${symbols[0]}</div>
+                    <div class="slot" id="s2">${symbols[0]}</div>
+                </div>
+                <div style="display:flex; gap:15px;">
+                    <button class="icon-btn restart" id="unlockBtn">✅</button>
+                    <button class="icon-btn" id="closePad">✕</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const clueBox = document.getElementById('clueBox');
+    function showClue(txt, x, y) {
+        playTone(600, 'sine', 0.1);
+        clueBox.innerText = txt;
+        clueBox.style.left = x + 'px';
+        clueBox.style.top = y + 'px';
+        clueBox.style.display = 'block';
+        setTimeout(() => clueBox.style.display = 'none', 1800);
+    }
+
+    document.getElementById('picItem').onclick = () => showClue(`1️⃣ ${secret[0]}`, 30, 100);
+    document.getElementById('clockItem').onclick = () => showClue(`2️⃣ ${secret[1]}`, 210, 95);
+    document.getElementById('plantItem').onclick = () => {
+        if (!hasKey) {
+            hasKey = true;
+            playTone(800, 'triangle', 0.2);
+            showClue('🗝️', 40, 310);
+        } else {
+            showClue('🌱', 40, 310);
+        }
+    };
+    document.getElementById('chestItem').onclick = () => {
+        if (hasKey) showClue(`3️⃣ ${secret[2]}`, 210, 310);
+        else {
+            playTone(180, 'sawtooth', 0.15);
+            showClue('🔒 🗝️?', 200, 310);
+        }
+    };
+    document.getElementById('doorItem').onclick = () => {
+        playTone(500, 'sine', 0.1);
+        document.getElementById('keypad').style.display = 'flex';
+    };
+    document.getElementById('closePad').onclick = () => {
+        document.getElementById('keypad').style.display = 'none';
+    };
+
+    [0, 1, 2].forEach(i => {
+        document.getElementById('s' + i).onclick = () => {
+            playTone(450 + i * 50, 'sine', 0.08);
+            guess[i] = (guess[i] + 1) % symbols.length;
+            document.getElementById('s' + i).innerText = symbols[guess[i]];
+        };
+    });
+
+    document.getElementById('unlockBtn').onclick = () => {
+        if (symbols[guess[0]] === secret[0] && symbols[guess[1]] === secret[1] && symbols[guess[2]] === secret[2]) {
+            playTone(900, 'triangle', 0.4);
+            addPoints(100);
+            document.getElementById('keypad').innerHTML = `<div style="font-size:5rem;">🎉🔓</div>`;
+            setTimeout(() => launchGame('escape'), 1500);
+        } else {
+            playTone(150, 'sawtooth', 0.25);
+            triggerShake();
+        }
+    };
+    return () => {};
+}
+
+function initZombie(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let px = 180, py = 220, tx = 180, ty = 220;
+    let bullets = [], zombies = [], frame = 0, alive = true;
+
+    function setTarget(cx, cy) {
+        const r = c.getBoundingClientRect();
+        tx = Math.max(20, Math.min(340, cx - r.left));
+        ty = Math.max(20, Math.min(420, cy - r.top));
+    }
+    c.onmousemove = e => setTarget(e.clientX, e.clientY);
+    c.ontouchmove = e => { e.preventDefault(); setTarget(e.touches[0].clientX, e.touches[0].clientY); };
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        frame++;
+        ctx.fillStyle = '#0c1409';
+        ctx.fillRect(0, 0, 360, 440);
+
+        px += (tx - px) * 0.12;
+        py += (ty - py) * 0.12;
+
+        if (frame % 32 === 0) {
+            const side = Math.floor(Math.random() * 4);
+            let zx = 0, zy = 0;
+            if (side === 0) { zx = Math.random() * 360; zy = -20; }
+            if (side === 1) { zx = 380; zy = Math.random() * 440; }
+            if (side === 2) { zx = Math.random() * 360; zy = 460; }
+            if (side === 3) { zx = -20; zy = Math.random() * 440; }
+            zombies.push({ x: zx, y: zy, s: 1.2 + Math.random() * 0.9 });
+        }
+
+        if (frame % 18 === 0 && zombies.length > 0) {
+            let nearest = zombies[0];
+            let minDist = Infinity;
+            zombies.forEach(z => {
+                const d = Math.hypot(z.x - px, z.y - py);
+                if (d < minDist) { minDist = d; nearest = z; }
+            });
+            const ang = Math.atan2(nearest.y - py, nearest.x - px);
+            bullets.push({ x: px, y: py, vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7 });
+            playTone(620, 'square', 0.04, 0.04);
+        }
+
+        ctx.font = '26px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🤠', px, py);
+
+        ctx.fillStyle = '#facc15';
+        bullets.forEach((b, bi) => {
+            b.x += b.vx; b.y += b.vy;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+            if (b.x < 0 || b.x > 360 || b.y < 0 || b.y > 440) bullets.splice(bi, 1);
+        });
+
+        zombies.forEach((z, zi) => {
+            const ang = Math.atan2(py - z.y, px - z.x);
+            z.x += Math.cos(ang) * z.s;
+            z.y += Math.sin(ang) * z.s;
+            ctx.fillText('🧟', z.x, z.y);
+
+            if (Math.hypot(z.x - px, z.y - py) < 22) {
+                alive = false;
+                playTone(110, 'sawtooth', 0.45);
+                triggerShake();
+            }
+
+            bullets.forEach((b, bi) => {
+                if (Math.hypot(z.x - b.x, z.y - b.y) < 18) {
+                    zombies.splice(zi, 1);
+                    bullets.splice(bi, 1);
+                    addPoints(15);
+                    playTone(280, 'sawtooth', 0.08);
+                }
+            });
+        });
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initPirate(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let sx = 180, sy = 220, tx = 180, ty = 220;
+    let treasure = { x: 80, y: 100 };
+    let rocks = [
+        { x: 110, y: 160, r: 22 },
+        { x: 250, y: 140, r: 24 },
+        { x: 180, y: 310, r: 26 },
+        { x: 80, y: 340, r: 20 }
+    ];
+    let frame = 0, alive = true;
+
+    function placeTreasure() {
+        let valid = false;
+        while (!valid) {
+            treasure = { x: 40 + Math.random() * 280, y: 40 + Math.random() * 360 };
+            valid = rocks.every(rk => Math.hypot(rk.x - treasure.x, rk.y - treasure.y) > rk.r + 35);
+        }
+    }
+    placeTreasure();
+
+    function steer(cx, cy) {
+        const r = c.getBoundingClientRect();
+        tx = Math.max(20, Math.min(340, cx - r.left));
+        ty = Math.max(20, Math.min(420, cy - r.top));
+    }
+    c.onmousedown = e => steer(e.clientX, e.clientY);
+    c.onmousemove = e => { if (e.buttons) steer(e.clientX, e.clientY); };
+    c.ontouchmove = e => { e.preventDefault(); steer(e.touches[0].clientX, e.touches[0].clientY); };
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        frame++;
+        ctx.fillStyle = '#0369a1';
+        ctx.fillRect(0, 0, 360, 440);
+
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 2;
+        for (let y = 30; y < 440; y += 50) {
+            ctx.beginPath();
+            ctx.moveTo(0, y + Math.sin(frame * 0.05 + y) * 5);
+            ctx.lineTo(360, y + Math.cos(frame * 0.05 + y) * 5);
+            ctx.stroke();
+        }
+
+        const dx = tx - sx, dy = ty - sy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 4) {
+            sx += (dx / dist) * 2.8;
+            sy += (dy / dist) * 2.8;
+        }
+
+        ctx.font = '30px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        rocks.forEach(rk => {
+            ctx.fillText('🪨', rk.x, rk.y);
+            if (Math.hypot(sx - rk.x, sy - rk.y) < rk.r + 8) {
+                alive = false;
+                playTone(120, 'sawtooth', 0.4);
+                triggerShake();
+            }
+        });
+
+        ctx.fillText('💎', treasure.x, treasure.y);
+        if (Math.hypot(sx - treasure.x, sy - treasure.y) < 28) {
+            addPoints(30);
+            playTone(780, 'triangle', 0.2);
+            placeTreasure();
+            if (rocks.length < 8) {
+                rocks.push({ x: 40 + Math.random() * 280, y: 40 + Math.random() * 360, r: 22 });
+            }
+        }
+
+        ctx.fillText('⛵', sx, sy);
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initRacing(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    const lanes =;[50,150]
+    let lane = 1, rivals = [], frame = 0, speed = 5, alive = true;
+
+    function changeLane(dir) {
+        if (!alive) return;
+        lane = Math.max(0, Math.min(2, lane + dir));
+function initSpace(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let px = 180, bullets = [], enemies = [], particles = [], frame = 0, alive = true;
+
+    function move(clientX) {
+        const r = c.getBoundingClientRect();
+        px = Math.max(20, Math.min(340, clientX - r.left));
+    }
+    c.onmousemove = e => move(e.clientX);
+    c.ontouchmove = e => move(e.touches[0].clientX);
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        frame++;
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        if (frame % 15 === 0) {
+            bullets.push({ x: px, y: 390 });
+            playTone(700, 'square', 0.05, 0.04);
+        }
+        if (frame % 35 === 0) {
+            enemies.push({ x: 25 + Math.random() * 310, y: -20, r: 16, s: 2 + Math.random() * 2 });
+        }
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(px, 385);
+        ctx.lineTo(px - 18, 415);
+        ctx.lineTo(px + 18, 415);
+        ctx.fill();
+
+        ctx.fillStyle = '#facc15';
+        bullets.forEach((b, i) => {
+            b.y -= 8;
+            ctx.fillRect(b.x - 2, b.y, 4, 12);
+            if (b.y < 0) bullets.splice(i, 1);
+        });
+
+        enemies.forEach((en, ei) => {
+            en.y += en.s;
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.arc(en.x, en.y, en.r, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (Math.hypot(en.x - px, en.y - 400) < en.r + 14 || en.y > 440) {
+                alive = false;
+                playTone(120, 'sawtooth', 0.4);
+                triggerShake();
+            }
+
+            bullets.forEach((b, bi) => {
+                if (Math.hypot(en.x - b.x, en.y - b.y) < en.r + 4) {
+                    for (let k = 0; k < 8; k++) {
+                        particles.push({ x: en.x, y: en.y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 15 });
+                    }
+                    enemies.splice(ei, 1);
+                    bullets.splice(bi, 1);
+                    addPoints(10);
+                    playTone(300, 'sawtooth', 0.08);
+                }
+            });
+        });
+
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life--;
+            ctx.fillStyle = '#fb923c';
+            ctx.fillRect(p.x, p.y, 4, 4);
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initGravity(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let py = 360, vy = 0, grav = 1, obs = [], frame = 0, alive = true;
+
+    function flip() {
+        if (!alive) return;
+        grav *= -1;
+        playTone(grav > 0 ? 350 : 550, 'triangle', 0.1);
+    }
+    c.onmousedown = flip;
+    c.ontouchstart = e => { e.preventDefault(); flip(); };
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        frame++;
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, 360, 40);
+        ctx.fillRect(0, 400, 360, 40);
+
+        vy += grav * 1.1;
+        py += vy;
+        if (py > 372) { py = 372; vy = 0; }
+        if (py < 40) { py = 40; vy = 0; }
+
+        ctx.fillStyle = '#a855f7';
+        ctx.fillRect(60, py, 28, 28);
+
+        if (frame % 55 === 0) {
+            const top = Math.random() > 0.5;
+            obs.push({ x: 360, y: top ? 40 : 340, w: 24, h: 60 });
+        }
+
+        obs.forEach((o, i) => {
+            o.x -= 5;
+            ctx.fillStyle = '#f43f5e';
+            ctx.fillRect(o.x, o.y, o.w, o.h);
+            if (o.x + o.w < 0) {
+                obs.splice(i, 1);
+                addPoints(5);
+            }
+            if (60 < o.x + o.w && 88 > o.x && py < o.y + o.h && py + 28 > o.y) {
+                alive = false;
+                playTone(130, 'sawtooth', 0.35);
+                triggerShake();
+            }
+        });
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initSlice(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let items = [], trail = [], frame = 0, alive = true;
+    const icons = ['🍉', '🍊', '🍋', '🍇', '🍓', '💣'];
+
+    function addTrail(x, y) {
+        const r = c.getBoundingClientRect();
+        const cx = x - r.left, cy = y - r.top;
+        trail.push({ x: cx, y: cy, life: 10 });
+        items.forEach((it, idx) => {
+            if (Math.hypot(it.x - cx, it.y - cy) < 32) {
+                if (it.icon === '💣') {
+                    alive = false;
+                    playTone(100, 'sawtooth', 0.4);
+                    triggerShake();
+                } else {
+                    items.splice(idx, 1);
+                    addPoints(10);
+                    playTone(680, 'sine', 0.08);
+                }
+            }
+        });
+    }
+    c.onmousemove = e => { if (e.buttons) addTrail(e.clientX, e.clientY); };
+    c.ontouchmove = e => { e.preventDefault(); addTrail(e.touches[0].clientX, e.touches[0].clientY); };
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        frame++;
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        if (frame % 35 === 0) {
+            items.push({
+                x: 50 + Math.random() * 260,
+                y: 440,
+                vx: (Math.random() - 0.5) * 4,
+                vy: -(11 + Math.random() * 3),
+                icon: icons[Math.floor(Math.random() * icons.length)]
+            });
+        }
+
+        ctx.font = '34px sans-serif';
+        ctx.textAlign = 'center';
+        items.forEach((it, i) => {
+            it.x += it.vx; it.y += it.vy; it.vy += 0.25;
+            ctx.fillText(it.icon, it.x, it.y);
+            if (it.y > 480) items.splice(i, 1);
+        });
+
+        trail.forEach((t, i) => {
+            t.life--;
+            ctx.fillStyle = `rgba(56, 189, 248, ${t.life / 10})`;
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, t.life * 0.8, 0, Math.PI * 2);
+            ctx.fill();
+            if (t.life <= 0) trail.splice(i, 1);
+        });
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initOrbit(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let angle = 0, rocks = [], frame = 0, alive = true;
+
+    function aim(cx, cy) {
+        const r = c.getBoundingClientRect();
+        angle = Math.atan2((cy - r.top) - 220, (cx - r.left) - 180);
+    }
+    c.onmousemove = e => aim(e.clientX, e.clientY);
+    c.ontouchmove = e => aim(e.touches[0].clientX, e.touches[0].clientY);
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        frame++;
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        ctx.fillStyle = '#06b6d4';
+        ctx.beginPath();
+        ctx.arc(180, 220, 26, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(180, 220, 52, angle - 0.65, angle + 0.65);
+        ctx.stroke();
+
+        if (frame % 45 === 0) {
+            const a = Math.random() * Math.PI * 2;
+            rocks.push({ x: 180 + Math.cos(a) * 240, y: 220 + Math.sin(a) * 240, a });
+        }
+
+        rocks.forEach((rk, i) => {
+            rk.x -= Math.cos(rk.a) * 2.5;
+            rk.y -= Math.sin(rk.a) * 2.5;
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.arc(rk.x, rk.y, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            const dist = Math.hypot(rk.x - 180, rk.y - 220);
+            if (dist < 58 && dist > 42) {
+                const ra = Math.atan2(rk.y - 220, rk.x - 180);
+                let diff = Math.abs(Math.atan2(Math.sin(ra - angle), Math.cos(ra - angle)));
+                if (diff < 0.75) {
+                    rocks.splice(i, 1);
+                    addPoints(10);
+                    playTone(580, 'sine', 0.08);
+                    return;
+                }
+            }
+            if (dist < 30) {
+                alive = false;
+                playTone(120, 'sawtooth', 0.4);
+                triggerShake();
+            }
+        });
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initCannon(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let aimAngle = -0.8, ball = null, target = { x: 270, y: 200 }, wind = 0;
+
+    function newTarget() {
+        target = { x: 180 + Math.random() * 140, y: 80 + Math.random() * 260 };
+        wind = (Math.random() - 0.5) * 0.12;
+    }
+    newTarget();
+
+    c.onmousemove = e => {
+        const r = c.getBoundingClientRect();
+        aimAngle = Math.atan2((e.clientY - r.top) - 400, (e.clientX - r.left) - 40);
+    };
+    c.onclick = () => {
+        if (!ball) {
+            ball = { x: 40, y: 400, vx: Math.cos(aimAngle) * 14, vy: Math.sin(aimAngle) * 14 };
+            playTone(300, 'triangle', 0.15);
+        }
+    };
+
+    const loop = setInterval(() => {
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillRect(180, 20, wind * 600, 6);
+
+        ctx.fillStyle = '#10b981';
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.moveTo(40, 400);
+        ctx.lineTo(40 + Math.cos(aimAngle) * 35, 400 + Math.sin(aimAngle) * 35);
+        ctx.stroke();
+
+        if (ball) {
+            ball.vx += wind;
+            ball.vy += 0.35;
+    let cx = 0, cy = 0;
+    while (cx < cols - 1 || cy < rows - 1) {
+        walls[cy][cx] = 0;
+        if (cx < cols - 1 && (cy === rows - 1 || Math.random() > 0.5)) cx++;
+        else cy++;
+    }
+    walls[rows - 1][cols - 1] = 0;
+
+    function step(dx, dy) {
+        const nx = px + dx, ny = py + dy;
+        if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && walls[ny][nx] === 0) {
+            px = nx; py = ny;
+            playTone(400, 'sine', 0.05);
+            if (px === cols - 1 && py === rows - 1) {
+                addPoints(50);
+                playTone(800, 'triangle', 0.3);
+                launchGame('maze');
+            }
+        }
+    }
+
+    const keyHandler = e => {
+        if (e.key === 'ArrowUp') step(0, -1);
+        if (e.key === 'ArrowDown') step(0, 1);
+        if (e.key === 'ArrowLeft') step(-1, 0);
+        if (e.key === 'ArrowRight') step(1, 0);
+    };
+    window.addEventListener('keydown', keyHandler);
+
+    c.onclick = e => {
+        const r = c.getBoundingClientRect();
+        const tx = e.clientX - r.left - (px * size + 20);
+        const ty = e.clientY - r.top - (py * size + 20);
+        if (Math.abs(tx) > Math.abs(ty)) step(tx > 0 ? 1 : -1, 0);
+        else step(0, ty > 0 ? 1 : -1);
+    };
+
+    const loop = setInterval(() => {
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+                if (walls[y][x]) {
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(x * size, y * size, size - 1, size - 1);
+                }
+            }
+        }
+
+        ctx.fillStyle = '#10b981';
+        ctx.fillRect((cols - 1) * size + 6, (rows - 1) * size + 6, size - 12, size - 12);
+
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(px * size + 20, py * size + 20, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, 360, 440);
+        ctx.arc(px * size + 20, py * size + 20, 75, 0, Math.PI * 2, true);
+        ctx.fillStyle = '#030508';
+        ctx.fill();
+        ctx.restore();
+    }, 1000 / 30);
+
+    return () => {
+        clearInterval(loop);
+        window.removeEventListener('keydown', keyHandler);
+    };
+}
+
+function initStack(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let blocks = [{ x: 100, w: 160, y: 400, color: '#ec4899' }];
+    let cur = { x: 0, w: 160, y: 370, dir: 4 };
+    let alive = true;
+
+    function drop() {
+        if (!alive) return;
+        const prev = blocks[blocks.length - 1];
+        const overlap = Math.min(cur.x + cur.w, prev.x + prev.w) - Math.max(cur.x, prev.x);
+        if (overlap <= 0) {
+            alive = false;
+            playTone(130, 'sawtooth', 0.35);
+            triggerShake();
+            return;
+        }
+        const newX = Math.max(cur.x, prev.x);
+        const hue = (blocks.length * 25) % 360;
+        blocks.push({ x: newX, w: overlap, y: cur.y, color: `hsl(${hue}, 80%, 60%)` });
+        addPoints(10);
+        playTone(400 + blocks.length * 20, 'sine', 0.1);
+
+        if (blocks.length > 8) {
+            blocks.forEach(b => b.y += 30);
+        }
+        cur = { x: 0, w: overlap, y: blocks[blocks.length - 1].y - 30, dir: 4 + blocks.length * 0.2 };
+    }
+    c.onmousedown = drop;
+    c.ontouchstart = e => { e.preventDefault(); drop(); };
+
+    const loop = setInterval(() => {
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        blocks.forEach(b => {
+            ctx.fillStyle = b.color;
+            ctx.fillRect(b.x, b.y, b.w, 28);
+        });
+
+        if (alive) {
+            cur.x += cur.dir;
+            if (cur.x + cur.w > 360 || cur.x < 0) cur.dir *= -1;
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(cur.x, cur.y, cur.w, 28);
+        }
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+
+function initPong(stage) {
+    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
+    const c = document.getElementById('c');
+    const ctx = c.getContext('2d');
+    let padX = 140, bx = 180, by = 220, vx = 3.5, vy = 4, alive = true;
+
+    function movePad(clientX) {
+        const r = c.getBoundingClientRect();
+        padX = Math.max(0, Math.min(280, (clientX - r.left) - 40));
+    }
+    c.onmousemove = e => movePad(e.clientX);
+    c.ontouchmove = e => movePad(e.touches[0].clientX);
+
+    const loop = setInterval(() => {
+        if (!alive) return;
+        ctx.fillStyle = '#060911';
+        ctx.fillRect(0, 0, 360, 440);
+
+        bx += vx; by += vy;
+        if (bx < 10 || bx > 350) { vx *= -1; playTone(300, 'sine', 0.05); }
+
+        ctx.fillStyle = '#14b8a6';
+        ctx.fillRect(padX, 20, 80, 12);
+        ctx.fillRect(padX, 408, 80, 12);
+
+        if (by <= 40 && bx >= padX && bx <= padX + 80) {
+            vy = Math.abs(vy) * 1.03;
+            addPoints(10);
+            playTone(520, 'triangle', 0.08);
+        }
+        if (by >= 400 && bx >= padX && bx <= padX + 80) {
+            vy = -Math.abs(vy) * 1.03;
+            addPoints(10);
+            playTone(520, 'triangle', 0.08);
+        }
+
+        if (by < 0 || by > 440) {
+            alive = false;
+            playTone(120, 'sawtooth', 0.4);
+            triggerShake();
+        }
+
+        ctx.fillStyle = '#facc15';
+        ctx.beginPath();
+        ctx.arc(bx, by, 10, 0, Math.PI * 2);
+        ctx.fill();
+    }, 1000 / 60);
+
+    return () => clearInterval(loop);
+}
+</script>
+</body>
+</html>
