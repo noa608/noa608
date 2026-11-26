@@ -1,1090 +1,246 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ARCADE</title>
-    <style>
-        :root {
-            --bg: #090d16;
-            --surface: #131b2e;
-            --accent: #38bdf8;
-        }
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-        body {
-            background: var(--bg);
-            color: #fff;
-            font-family: system-ui, -apple-system, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
-        }
-        header {
-            width: 100%;
-            max-width: 900px;
-            padding: 1.2rem 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .brand {
-            font-size: 2.2rem;
-            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.5));
-        }
-        .hud {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-        }
-        .pill {
-            background: var(--surface);
-            border: 1px solid rgba(255,255,255,0.1);
-            padding: 0.5rem 1.2rem;
-            border-radius: 99px;
-            font-size: 1.2rem;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .pill:hover {
-            border-color: var(--accent);
-            transform: scale(1.05);
-        }
-        .grid {
-            width: 100%;
-            max-width: 900px;
-            padding: 1rem 1.5rem 3rem;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.2rem;
-        }
-        @media (max-width: 600px) {
-            .grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        .tile {
-            aspect-ratio: 1 / 1;
-            border-radius: 28px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 4.5rem;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
-            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s;
-            border: 2px solid rgba(255,255,255,0.12);
-        }
-        .tile:hover {
-            transform: translateY(-8px) scale(1.04);
-            box-shadow: 0 20px 35px rgba(0,0,0,0.6);
-            border-color: rgba(255,255,255,0.5);
-        }
-        .tile:active {
-            transform: scale(0.96);
-        }
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(9, 13, 22, 0.96);
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
-        .modal.active {
-            display: flex;
-        }
-        .top-bar {
-            width: 100%;
-            max-width: 460px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-        .icon-btn {
-            background: var(--surface);
-            border: 1px solid rgba(255,255,255,0.15);
-            color: #fff;
-            width: 48px;
-            height: 48px;
-            border-radius: 16px;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .icon-btn:hover {
-            background: #ef4444;
-            border-color: #ef4444;
-        }
-        .icon-btn.restart:hover {
-            background: #10b981;
-            border-color: #10b981;
-        }
-        .stage {
-            background: var(--surface);
-            border: 2px solid rgba(255,255,255,0.1);
-            border-radius: 24px;
-            padding: 12px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.7);
-        }
-        canvas {
-            background: #060911;
-            border-radius: 16px;
-            display: block;
-            touch-action: none;
-        }
-        .shake {
-            animation: shake 0.3s ease-in-out;
-        }
-        @keyframes shake {
-            0%, 100% { transform: translate(0, 0); }
-            25% { transform: translate(-6px, 4px); }
-            50% { transform: translate(6px, -4px); }
-            75% { transform: translate(-4px, -4px); }
-        }
-        .room {
-            width: 360px;
-            height: 440px;
-            background: linear-gradient(180deg, #1e293b 0%, #0f172a 75%, #090d16 75%);
-            border-radius: 16px;
-            position: relative;
-            overflow: hidden;
-        }
-        .room-item {
-            position: absolute;
-            font-size: 2.8rem;
-            cursor: pointer;
-            transition: transform 0.2s;
-            filter: drop-shadow(0 5px 8px rgba(0,0,0,0.5));
-        }
-        .room-item:hover {
-            transform: scale(1.15);
-        }
-        .clue-bubble {
-            position: absolute;
-            background: rgba(15, 23, 42, 0.95);
-            border: 2px solid #38bdf8;
-            padding: 8px 14px;
-            border-radius: 14px;
-            font-size: 1.5rem;
-            display: none;
-            z-index: 10;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.8);
-        }
-        .keypad {
-            position: absolute;
-            inset: 40px;
-            background: rgba(15, 23, 42, 0.98);
-            border: 2px solid #f59e0b;
-            border-radius: 20px;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            z-index: 20;
-        }
-        .code-slots {
-            display: flex;
-            gap: 10px;
-            direction: ltr;
-        }
-        .slot {
-            width: 55px;
-            height: 65px;
-            background: #1e293b;
-            border: 2px solid #475569;
-            border-radius: 12px;
-            font-size: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-        .fashion-wrap {
-            width: 360px;
-            height: 440px;
-            background: linear-gradient(180deg, #3b0764 0%, #1e1b4b 100%);
-            border-radius: 16px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 16px;
-        }
-        .model-stage {
-            width: 220px;
-            height: 240px;
-            background: rgba(255,255,255,0.06);
-            border: 2px solid rgba(244, 114, 182, 0.4);
-            border-radius: 24px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            box-shadow: 0 10px 30px rgba(236, 72, 153, 0.25);
-        }
-        .fashion-layer {
-            font-size: 3.2rem;
-            line-height: 1.05;
-            transition: transform 0.2s;
-        }
-        .fashion-controls {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 10px;
-            width: 100%;
-        }
-        .f-btn {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 16px;
-            height: 64px;
-            font-size: 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: 0.15s;
-        }
-        .f-btn:active {
-            transform: scale(0.9);
-            background: #ec4899;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>פינת המשחקים</title>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@500;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1c1240;--card:#2f1f6b;--ink:#fff7e6;--hot:#ff4f8b;--sun:#ffc93c;--sky:#3cd3ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;font-family:Rubik,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding:max(12px,env(safe-area-inset-top)) 12px 24px}
+h1{font-size:2.2rem;font-weight:800;margin:8px 0 4px;text-align:center}
+.sub{text-align:center;opacity:.8;margin:0 0 18px}
+.screen{display:none;max-width:420px;margin:auto}
+.screen.on{display:block}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card{border:0;border-radius:22px;padding:22px 8px;color:#1c1240;font:800 1.2rem Rubik,sans-serif;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.card span{font-size:3rem}
+.card:active,.btn:active{transform:scale(.96)}
+.btn{border:0;border-radius:14px;padding:10px 16px;background:var(--sun);color:#1c1240;font:800 1rem Rubik,sans-serif;cursor:pointer}
+.back{background:var(--card);color:var(--ink);margin-bottom:10px}
+canvas{display:block;width:100%;max-width:360px;margin:auto;border-radius:16px;touch-action:none;background:#120a2e}
+.hint{text-align:center;opacity:.8;margin:8px 0}
+#room{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--card);padding:14px;border-radius:20px}
+#room button{border:0;border-radius:16px;background:#412b8f;color:var(--ink);font:500 .9rem Rubik,sans-serif;padding:14px 4px;cursor:pointer}
+#room button span{display:block;font-size:2.4rem}
+#msg{min-height:3.2em;background:#120a2e;border-radius:14px;padding:12px;margin:12px 0}
+.code{display:flex;gap:8px}
+.code input{flex:1;border:2px solid var(--sky);border-radius:12px;background:#120a2e;color:var(--ink);font:800 1.3rem Rubik,sans-serif;text-align:center;letter-spacing:.3em;padding:8px}
+#face{display:block;width:100%;max-width:260px;margin:0 auto 10px}
+.row{display:flex;align-items:center;gap:8px;margin:8px 0}
+.row b{width:60px}
+.sw{width:34px;height:34px;border-radius:50%;border:3px solid #fff7e6;cursor:pointer;padding:0}
+.tools{display:flex;gap:8px;justify-content:center;margin-top:14px}
+</style>
 </head>
 <body>
 
-<header>
-    <div class="brand">🕹️</div>
-    <div class="hud">
-        <div class="pill" id="soundBtn" onclick="toggleSound()">🔊</div>
-        <div class="pill">🏆 <span id="scoreVal">0</span></div>
-    </div>
-</header>
+<section class="screen on" id="home">
+  <h1>פינת המשחקים</h1>
+  <p class="sub">בחרו משחק ותתחילו לשחק</p>
+  <div class="grid">
+    <button class="card" style="background:var(--sun)" onclick="go('escape')"><span>🗝️</span>חדר בריחה</button>
+    <button class="card" style="background:#7bdc7b" onclick="go('zomb')"><span>🧟</span>זומבים</button>
+    <button class="card" style="background:var(--sky)" onclick="go('pong')"><span>🏓</span>פינג פונג</button>
+    <button class="card" style="background:var(--hot)" onclick="go('makeup')"><span>💄</span>איפור</button>
+  </div>
+</section>
 
-<div class="grid" id="lobby"></div>
+<section class="screen" id="pong">
+  <button class="btn back" onclick="go('home')">חזרה לתפריט</button>
+  <canvas id="c1" width="360" height="560"></canvas>
+  <p class="hint">גררו את האצבע כדי להזיז את המחבט. מי שמגיע ל-5 מנצח.</p>
+</section>
 
-<div class="modal" id="modal">
-    <div class="top-bar">
-        <div class="pill">⭐ <span id="gameScore">0</span></div>
-        <div style="display:flex; gap:10px;">
-            <button class="icon-btn restart" onclick="restartCurrent()">🔄</button>
-            <button class="icon-btn" onclick="closeModal()">✕</button>
-        </div>
-    </div>
-    <div class="stage" id="stage"></div>
-</div>
+<section class="screen" id="zomb">
+  <button class="btn back" onclick="go('home')">חזרה לתפריט</button>
+  <canvas id="c2" width="360" height="560"></canvas>
+  <p class="hint">גררו כדי לזוז. הדמות יורה לבד על הזומבי הקרוב.</p>
+</section>
+
+<section class="screen" id="escape">
+  <button class="btn back" onclick="go('home')">חזרה לתפריט</button>
+  <div id="room">
+    <button data-i="lamp"><span>💡</span>מנורה</button>
+    <button data-i="art"><span>🖼️</span>תמונה</button>
+    <button data-i="sofa"><span>🛋️</span>ספה</button>
+    <button data-i="box"><span>📦</span>תיבה</button>
+    <button data-i="inv"><span>🎒</span>תיק</button>
+    <button data-i="door"><span>🚪</span>דלת</button>
+  </div>
+  <div id="msg">נעלתם בחדר. חפשו רמזים ופתחו את הדלת.</div>
+  <div class="code"><input id="code" inputmode="numeric" maxlength="3" placeholder="000"><button class="btn" id="ok">פתח תיבה</button></div>
+</section>
+
+<section class="screen" id="makeup">
+  <button class="btn back" onclick="go('home')">חזרה לתפריט</button>
+  <svg id="face" viewBox="0 0 200 250">
+    <path id="hair" d="M30 120C25 40 175 40 170 120L178 230H22Z" fill="#4a2c17"/>
+    <rect id="neck" x="82" y="180" width="36" height="50" fill="#f1c9a5"/>
+    <ellipse id="face2" cx="100" cy="115" rx="58" ry="75" fill="#f1c9a5"/>
+    <circle id="b1" cx="68" cy="140" r="14" fill="#ff8aa5" opacity=".5"/>
+    <circle id="b2" cx="132" cy="140" r="14" fill="#ff8aa5" opacity=".5"/>
+    <ellipse id="s1" cx="75" cy="98" rx="17" ry="10" fill="#a58cff" opacity=".7"/>
+    <ellipse id="s2" cx="125" cy="98" rx="17" ry="10" fill="#a58cff" opacity=".7"/>
+    <ellipse cx="75" cy="105" rx="12" ry="7" fill="#fff"/><circle cx="75" cy="105" r="5" fill="#3b2415"/>
+    <ellipse cx="125" cy="105" rx="12" ry="7" fill="#fff"/><circle cx="125" cy="105" r="5" fill="#3b2415"/>
+    <path d="M60 88Q75 80 90 88M110 88Q125 80 140 88" stroke="#3b2415" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M100 112Q94 135 102 138" stroke="#c9967a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path id="lip" d="M76 162Q100 148 124 162Q100 188 76 162Z" fill="#d6336c"/>
+  </svg>
+  <div id="sw"></div>
+  <div class="tools"><button class="btn" id="rnd">אקראי</button><button class="btn back" id="rst">איפוס</button></div>
+</section>
 
 <script>
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let actx = null;
-let soundOn = true;
-
-function playTone(freq, type = 'sine', dur = 0.1, vol = 0.1) {
-    if (!soundOn) return;
-    if (!actx) actx = new AudioCtx();
-    if (actx.state === 'suspended') actx.resume();
-    const osc = actx.createOscillator();
-    const gain = actx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, actx.currentTime);
-    gain.gain.setValueAtTime(vol, actx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
-    osc.connect(gain);
-    gain.connect(actx.destination);
-    osc.start();
-    osc.stop(actx.currentTime + dur);
+const $=s=>document.querySelector(s);
+let stop=null;
+const games={};
+function go(id){
+  if(stop)stop();stop=null;
+  document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id===id));
+  if(games[id])stop=games[id]();
+  scrollTo(0,0);
 }
-
-function toggleSound() {
-    soundOn = !soundOn;
-    document.getElementById('soundBtn').innerText = soundOn ? '🔊' : '🔇';
-    if (soundOn) playTone(520, 'triangle', 0.1);
+function loop(f){
+  let r,on=1;
+  (function l(){if(!on)return;f();r=requestAnimationFrame(l)})();
+  return()=>{on=0;cancelAnimationFrame(r)};
 }
+function pos(c,e){const r=c.getBoundingClientRect();return{x:(e.clientX-r.left)/r.width*360,y:(e.clientY-r.top)/r.height*560}}
+function msg(x,t,w,h){x.fillStyle='rgba(18,10,46,.85)';x.fillRect(0,h/2-60,w,120);x.fillStyle='#fff7e6';x.textAlign='center';x.font='800 28px Rubik,sans-serif';x.fillText(t,w/2,h/2);x.font='500 16px Rubik,sans-serif';x.fillText('גע במסך כדי לשחק שוב',w/2,h/2+34)}
 
-
-function initEscape(stage) {
-    const symbols = ['🌙', '🔥', '💧', '⚡', '🍀', '💎'];
-    const secret = [
-        symbols[Math.floor(Math.random() * symbols.length)],
-        symbols[Math.floor(Math.random() * symbols.length)],
-        symbols[Math.floor(Math.random() * symbols.length)]
-    ];
-    let guess =;
-    let hasKey = false;
-
-    stage.innerHTML = `
-        <div class="room" id="escRoom">
-            <div class="room-item" style="top:40px; left:35px;" id="picItem">🖼️</div>
-            <div class="room-item" style="top:35px; right:40px;" id="clockItem">🕰️</div>
-            <div class="room-item" style="bottom:115px; left:140px; font-size:4.5rem;" id="doorItem">🚪</div>
-            <div class="room-item" style="bottom:45px; left:35px;" id="plantItem">🪴</div>
-            <div class="room-item" style="bottom:45px; right:40px;" id="chestItem">🧰</div>
-            <div class="clue-bubble" id="clueBox"></div>
-            <div class="keypad" id="keypad">
-                <div style="font-size:2.5rem;">🔒</div>
-                <div class="code-slots">
-                    <div class="slot" id="s0">${symbols[0]}</div>
-                    <div class="slot" id="s1">${symbols[0]}</div>
-                    <div class="slot" id="s2">${symbols[0]}</div>
-                </div>
-                <div style="display:flex; gap:15px;">
-                    <button class="icon-btn restart" id="unlockBtn">✅</button>
-                    <button class="icon-btn" id="closePad">✕</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    const clueBox = document.getElementById('clueBox');
-    function showClue(txt, x, y) {
-        playTone(600, 'sine', 0.1);
-        clueBox.innerText = txt;
-        clueBox.style.left = x + 'px';
-        clueBox.style.top = y + 'px';
-        clueBox.style.display = 'block';
-        setTimeout(() => clueBox.style.display = 'none', 1800);
+/* ---------- פינג פונג ---------- */
+games.pong=()=>{
+  const c=$('#c1'),x=c.getContext('2d'),PW=70;
+  let p=145,a=145,s=[0,0],b,done=0;
+  const reset=d=>b={x:180,y:280,vx:Math.random()*4-2,vy:d*4};
+  reset(1);
+  c.onpointermove=c.onpointerdown=e=>{
+    p=Math.max(0,Math.min(360-PW,pos(c,e).x-PW/2));
+    if(done){done=0;s=[0,0];reset(1)}
+  };
+  return loop(()=>{
+    if(!done){
+      a+=(b.x-PW/2-a)*.07;
+      b.x+=b.vx;b.y+=b.vy;
+      if(b.x<7||b.x>353)b.vx*=-1;
+      if(b.vy>0&&b.y>523&&b.y<540&&b.x>p&&b.x<p+PW){b.vy=-Math.min(10,b.vy*1.05);b.vx=(b.x-p-PW/2)/6}
+      if(b.vy<0&&b.y<37&&b.y>20&&b.x>a&&b.x<a+PW){b.vy=Math.min(10,-b.vy*1.03);b.vx=(b.x-a-PW/2)/6}
+      if(b.y<0){s[0]++;reset(1)}
+      if(b.y>560){s[1]++;reset(-1)}
+      if(s[0]>=5||s[1]>=5)done=1;
     }
+    x.clearRect(0,0,360,560);
+    x.setLineDash([10,10]);x.strokeStyle='#412b8f';x.beginPath();x.moveTo(0,280);x.lineTo(360,280);x.stroke();x.setLineDash([]);
+    x.fillStyle='#ff4f8b';x.fillRect(a,16,PW,10);
+    x.fillStyle='#3cd3ff';x.fillRect(p,534,PW,10);
+    x.fillStyle='#ffc93c';x.beginPath();x.arc(b.x,b.y,7,0,7);x.fill();
+    x.fillStyle='#fff7e6';x.font='800 24px Rubik,sans-serif';x.textAlign='left';
+    x.fillText(s[1],16,262);x.fillText(s[0],16,314);
+    if(done)msg(x,s[0]>=5?'ניצחתם! 🎉':'הפסדתם',360,560);
+  });
+};
 
-    document.getElementById('picItem').onclick = () => showClue(`1️⃣ ${secret[0]}`, 30, 100);
-    document.getElementById('clockItem').onclick = () => showClue(`2️⃣ ${secret[1]}`, 210, 95);
-    document.getElementById('plantItem').onclick = () => {
-        if (!hasKey) {
-            hasKey = true;
-            playTone(800, 'triangle', 0.2);
-            showClue('🗝️', 40, 310);
-        } else {
-            showClue('🌱', 40, 310);
-        }
-    };
-    document.getElementById('chestItem').onclick = () => {
-        if (hasKey) showClue(`3️⃣ ${secret[2]}`, 210, 310);
-        else {
-            playTone(180, 'sawtooth', 0.15);
-            showClue('🔒 🗝️?', 200, 310);
-        }
-    };
-    document.getElementById('doorItem').onclick = () => {
-        playTone(500, 'sine', 0.1);
-        document.getElementById('keypad').style.display = 'flex';
-    };
-    document.getElementById('closePad').onclick = () => {
-        document.getElementById('keypad').style.display = 'none';
-    };
-
-    [0, 1, 2].forEach(i => {
-        document.getElementById('s' + i).onclick = () => {
-            playTone(450 + i * 50, 'sine', 0.08);
-            guess[i] = (guess[i] + 1) % symbols.length;
-            document.getElementById('s' + i).innerText = symbols[guess[i]];
-        };
-    });
-
-    document.getElementById('unlockBtn').onclick = () => {
-        if (symbols[guess[0]] === secret[0] && symbols[guess[1]] === secret[1] && symbols[guess[2]] === secret[2]) {
-            playTone(900, 'triangle', 0.4);
-            addPoints(100);
-            document.getElementById('keypad').innerHTML = `<div style="font-size:5rem;">🎉🔓</div>`;
-            setTimeout(() => launchGame('escape'), 1500);
-        } else {
-            playTone(150, 'sawtooth', 0.25);
-            triggerShake();
-        }
-    };
-    return () => {};
-}
-
-function initZombie(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let px = 180, py = 220, tx = 180, ty = 220;
-    let bullets = [], zombies = [], frame = 0, alive = true;
-
-    function setTarget(cx, cy) {
-        const r = c.getBoundingClientRect();
-        tx = Math.max(20, Math.min(340, cx - r.left));
-        ty = Math.max(20, Math.min(420, cy - r.top));
+/* ---------- זומבים ---------- */
+games.zomb=()=>{
+  const c=$('#c2'),x=c.getContext('2d');
+  let P,T,Z,B,hp,sc,t,over;
+  const init=()=>{P={x:180,y:300};T={x:180,y:300};Z=[];B=[];hp=100;sc=0;t=0;over=0};
+  init();
+  c.onpointermove=c.onpointerdown=e=>{
+    T=pos(c,e);
+    if(over&&t>40)init();
+  };
+  const spawn=()=>{
+    const s=Math.random()*4|0,r=Math.random();
+    Z.push({x:s<2?r*360:s==2?-20:380,y:s==0?-20:s==1?580:r*560,h:2});
+  };
+  return loop(()=>{
+    t++;
+    if(!over){
+      P.x+=(T.x-P.x)*.12;P.y+=(T.y-P.y)*.12;
+      if(t%Math.max(18,60-sc)==0)spawn();
+      if(t%14==0&&Z.length){
+        let n=Z[0],d=1e9;
+        Z.forEach(z=>{const q=Math.hypot(z.x-P.x,z.y-P.y);if(q<d){d=q;n=z}});
+        B.push({x:P.x,y:P.y,vx:(n.x-P.x)/(d||1)*9,vy:(n.y-P.y)/(d||1)*9});
+      }
+      B.forEach(b=>{b.x+=b.vx;b.y+=b.vy});
+      B=B.filter(b=>b.x>-10&&b.x<370&&b.y>-10&&b.y<570);
+      Z.forEach(z=>{
+        const q=Math.hypot(P.x-z.x,P.y-z.y)||1,sp=.7+Math.min(sc,40)/60;
+        z.x+=(P.x-z.x)/q*sp;z.y+=(P.y-z.y)/q*sp;
+        B.forEach(b=>{if(Math.hypot(b.x-z.x,b.y-z.y)<15){z.h--;b.x=-99}});
+        if(q<20)hp-=.4;
+      });
+      Z=Z.filter(z=>z.h>0||(sc++,0));
+      if(hp<=0){over=1;t=0}
     }
-    c.onmousemove = e => setTarget(e.clientX, e.clientY);
-    c.ontouchmove = e => { e.preventDefault(); setTarget(e.touches[0].clientX, e.touches[0].clientY); };
+    x.fillStyle='#16301f';x.fillRect(0,0,360,560);
+    x.textAlign='center';x.font='28px serif';
+    Z.forEach(z=>x.fillText('🧟',z.x,z.y+10));
+    x.fillText('🦸',P.x,P.y+10);
+    x.fillStyle='#ffc93c';
+    B.forEach(b=>{x.beginPath();x.arc(b.x,b.y,3.5,0,7);x.fill()});
+    x.fillStyle='#412b8f';x.fillRect(12,12,150,10);
+    x.fillStyle='#ff4f8b';x.fillRect(12,12,Math.max(0,hp)*1.5,10);
+    x.fillStyle='#fff7e6';x.font='800 18px Rubik,sans-serif';x.textAlign='right';
+    x.fillText('חיסולים: '+sc,348,24);
+    if(over)msg(x,'הזומבים ניצחו',360,560);
+  });
+};
 
-    const loop = setInterval(() => {
-        if (!alive) return;
-        frame++;
-        ctx.fillStyle = '#0c1409';
-        ctx.fillRect(0, 0, 360, 440);
-
-        px += (tx - px) * 0.12;
-        py += (ty - py) * 0.12;
-
-        if (frame % 32 === 0) {
-            const side = Math.floor(Math.random() * 4);
-            let zx = 0, zy = 0;
-            if (side === 0) { zx = Math.random() * 360; zy = -20; }
-            if (side === 1) { zx = 380; zy = Math.random() * 440; }
-            if (side === 2) { zx = Math.random() * 360; zy = 460; }
-            if (side === 3) { zx = -20; zy = Math.random() * 440; }
-            zombies.push({ x: zx, y: zy, s: 1.2 + Math.random() * 0.9 });
-        }
-
-        if (frame % 18 === 0 && zombies.length > 0) {
-            let nearest = zombies[0];
-            let minDist = Infinity;
-            zombies.forEach(z => {
-                const d = Math.hypot(z.x - px, z.y - py);
-                if (d < minDist) { minDist = d; nearest = z; }
-            });
-            const ang = Math.atan2(nearest.y - py, nearest.x - px);
-            bullets.push({ x: px, y: py, vx: Math.cos(ang) * 7, vy: Math.sin(ang) * 7 });
-            playTone(620, 'square', 0.04, 0.04);
-        }
-
-        ctx.font = '26px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🤠', px, py);
-
-        ctx.fillStyle = '#facc15';
-        bullets.forEach((b, bi) => {
-            b.x += b.vx; b.y += b.vy;
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
-            ctx.fill();
-            if (b.x < 0 || b.x > 360 || b.y < 0 || b.y > 440) bullets.splice(bi, 1);
-        });
-
-        zombies.forEach((z, zi) => {
-            const ang = Math.atan2(py - z.y, px - z.x);
-            z.x += Math.cos(ang) * z.s;
-            z.y += Math.sin(ang) * z.s;
-            ctx.fillText('🧟', z.x, z.y);
-
-            if (Math.hypot(z.x - px, z.y - py) < 22) {
-                alive = false;
-                playTone(110, 'sawtooth', 0.45);
-                triggerShake();
-            }
-
-            bullets.forEach((b, bi) => {
-                if (Math.hypot(z.x - b.x, z.y - b.y) < 18) {
-                    zombies.splice(zi, 1);
-                    bullets.splice(bi, 1);
-                    addPoints(15);
-                    playTone(280, 'sawtooth', 0.08);
-                }
-            });
-        });
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initPirate(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let sx = 180, sy = 220, tx = 180, ty = 220;
-    let treasure = { x: 80, y: 100 };
-    let rocks = [
-        { x: 110, y: 160, r: 22 },
-        { x: 250, y: 140, r: 24 },
-        { x: 180, y: 310, r: 26 },
-        { x: 80, y: 340, r: 20 }
-    ];
-    let frame = 0, alive = true;
-
-    function placeTreasure() {
-        let valid = false;
-        while (!valid) {
-            treasure = { x: 40 + Math.random() * 280, y: 40 + Math.random() * 360 };
-            valid = rocks.every(rk => Math.hypot(rk.x - treasure.x, rk.y - treasure.y) > rk.r + 35);
-        }
+/* ---------- חדר בריחה ---------- */
+games.escape=()=>{
+  const st={key:0,box:0},m=$('#msg'),t0=Date.now();
+  m.textContent='נעלתם בחדר. חפשו רמזים ופתחו את הדלת.';
+  $('#code').value='';
+  const say=t=>m.textContent=t;
+  const hit={
+    lamp:()=>say('מתחת למנורה יש פתק: הספרה הראשונה היא 7.'),
+    art:()=>say('מאחורי התמונה כתוב: הספרה האמצעית היא 3.'),
+    sofa:()=>say('בין הכריות מצאתם פתק: הספרה האחרונה היא 9.'),
+    box:()=>say(st.box?'התיבה פתוחה וריקה.':'התיבה נעולה בקוד של 3 ספרות. הקלידו אותו למטה.'),
+    inv:()=>say(st.key?'בתיק יש מפתח 🔑':'התיק ריק.'),
+    door:()=>{
+      if(st.key)say('הדלת נפתחה! יצאתם אחרי '+Math.round((Date.now()-t0)/1000)+' שניות 🎉');
+      else say('הדלת נעולה. צריך מפתח.');
     }
-    placeTreasure();
-
-    function steer(cx, cy) {
-        const r = c.getBoundingClientRect();
-        tx = Math.max(20, Math.min(340, cx - r.left));
-        ty = Math.max(20, Math.min(420, cy - r.top));
-    }
-    c.onmousedown = e => steer(e.clientX, e.clientY);
-    c.onmousemove = e => { if (e.buttons) steer(e.clientX, e.clientY); };
-    c.ontouchmove = e => { e.preventDefault(); steer(e.touches[0].clientX, e.touches[0].clientY); };
-
-    const loop = setInterval(() => {
-        if (!alive) return;
-        frame++;
-        ctx.fillStyle = '#0369a1';
-        ctx.fillRect(0, 0, 360, 440);
-
-        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-        ctx.lineWidth = 2;
-        for (let y = 30; y < 440; y += 50) {
-            ctx.beginPath();
-            ctx.moveTo(0, y + Math.sin(frame * 0.05 + y) * 5);
-            ctx.lineTo(360, y + Math.cos(frame * 0.05 + y) * 5);
-            ctx.stroke();
-        }
-
-        const dx = tx - sx, dy = ty - sy;
-        const dist = Math.hypot(dx, dy);
-        if (dist > 4) {
-            sx += (dx / dist) * 2.8;
-            sy += (dy / dist) * 2.8;
-        }
-
-        ctx.font = '30px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        rocks.forEach(rk => {
-            ctx.fillText('🪨', rk.x, rk.y);
-            if (Math.hypot(sx - rk.x, sy - rk.y) < rk.r + 8) {
-                alive = false;
-                playTone(120, 'sawtooth', 0.4);
-                triggerShake();
-            }
-        });
-
-        ctx.fillText('💎', treasure.x, treasure.y);
-        if (Math.hypot(sx - treasure.x, sy - treasure.y) < 28) {
-            addPoints(30);
-            playTone(780, 'triangle', 0.2);
-            placeTreasure();
-            if (rocks.length < 8) {
-                rocks.push({ x: 40 + Math.random() * 280, y: 40 + Math.random() * 360, r: 22 });
-            }
-        }
-
-        ctx.fillText('⛵', sx, sy);
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initRacing(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    const lanes =;[50,150]
-    let lane = 1, rivals = [], frame = 0, speed = 5, alive = true;
-
-    function changeLane(dir) {
-        if (!alive) return;
-        lane = Math.max(0, Math.min(2, lane + dir));
-function initSpace(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let px = 180, bullets = [], enemies = [], particles = [], frame = 0, alive = true;
-
-    function move(clientX) {
-        const r = c.getBoundingClientRect();
-        px = Math.max(20, Math.min(340, clientX - r.left));
-    }
-    c.onmousemove = e => move(e.clientX);
-    c.ontouchmove = e => move(e.touches[0].clientX);
-
-    const loop = setInterval(() => {
-        if (!alive) return;
-        frame++;
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        if (frame % 15 === 0) {
-            bullets.push({ x: px, y: 390 });
-            playTone(700, 'square', 0.05, 0.04);
-        }
-        if (frame % 35 === 0) {
-            enemies.push({ x: 25 + Math.random() * 310, y: -20, r: 16, s: 2 + Math.random() * 2 });
-        }
-
-        ctx.fillStyle = '#38bdf8';
-        ctx.beginPath();
-        ctx.moveTo(px, 385);
-        ctx.lineTo(px - 18, 415);
-        ctx.lineTo(px + 18, 415);
-        ctx.fill();
-
-        ctx.fillStyle = '#facc15';
-        bullets.forEach((b, i) => {
-            b.y -= 8;
-            ctx.fillRect(b.x - 2, b.y, 4, 12);
-            if (b.y < 0) bullets.splice(i, 1);
-        });
-
-        enemies.forEach((en, ei) => {
-            en.y += en.s;
-            ctx.fillStyle = '#f43f5e';
-            ctx.beginPath();
-            ctx.arc(en.x, en.y, en.r, 0, Math.PI * 2);
-            ctx.fill();
-
-            if (Math.hypot(en.x - px, en.y - 400) < en.r + 14 || en.y > 440) {
-                alive = false;
-                playTone(120, 'sawtooth', 0.4);
-                triggerShake();
-            }
-
-            bullets.forEach((b, bi) => {
-                if (Math.hypot(en.x - b.x, en.y - b.y) < en.r + 4) {
-                    for (let k = 0; k < 8; k++) {
-                        particles.push({ x: en.x, y: en.y, vx: (Math.random() - 0.5) * 6, vy: (Math.random() - 0.5) * 6, life: 15 });
-                    }
-                    enemies.splice(ei, 1);
-                    bullets.splice(bi, 1);
-                    addPoints(10);
-                    playTone(300, 'sawtooth', 0.08);
-                }
-            });
-        });
-
-        particles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; p.life--;
-            ctx.fillStyle = '#fb923c';
-            ctx.fillRect(p.x, p.y, 4, 4);
-            if (p.life <= 0) particles.splice(i, 1);
-        });
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initGravity(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let py = 360, vy = 0, grav = 1, obs = [], frame = 0, alive = true;
-
-    function flip() {
-        if (!alive) return;
-        grav *= -1;
-        playTone(grav > 0 ? 350 : 550, 'triangle', 0.1);
-    }
-    c.onmousedown = flip;
-    c.ontouchstart = e => { e.preventDefault(); flip(); };
-
-    const loop = setInterval(() => {
-        if (!alive) return;
-        frame++;
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        ctx.fillStyle = '#1e293b';
-        ctx.fillRect(0, 0, 360, 40);
-        ctx.fillRect(0, 400, 360, 40);
-
-        vy += grav * 1.1;
-        py += vy;
-        if (py > 372) { py = 372; vy = 0; }
-        if (py < 40) { py = 40; vy = 0; }
-
-        ctx.fillStyle = '#a855f7';
-        ctx.fillRect(60, py, 28, 28);
-
-        if (frame % 55 === 0) {
-            const top = Math.random() > 0.5;
-            obs.push({ x: 360, y: top ? 40 : 340, w: 24, h: 60 });
-        }
-
-        obs.forEach((o, i) => {
-            o.x -= 5;
-            ctx.fillStyle = '#f43f5e';
-            ctx.fillRect(o.x, o.y, o.w, o.h);
-            if (o.x + o.w < 0) {
-                obs.splice(i, 1);
-                addPoints(5);
-            }
-            if (60 < o.x + o.w && 88 > o.x && py < o.y + o.h && py + 28 > o.y) {
-                alive = false;
-                playTone(130, 'sawtooth', 0.35);
-                triggerShake();
-            }
-        });
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initSlice(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let items = [], trail = [], frame = 0, alive = true;
-    const icons = ['🍉', '🍊', '🍋', '🍇', '🍓', '💣'];
-
-    function addTrail(x, y) {
-        const r = c.getBoundingClientRect();
-        const cx = x - r.left, cy = y - r.top;
-        trail.push({ x: cx, y: cy, life: 10 });
-        items.forEach((it, idx) => {
-            if (Math.hypot(it.x - cx, it.y - cy) < 32) {
-                if (it.icon === '💣') {
-                    alive = false;
-                    playTone(100, 'sawtooth', 0.4);
-                    triggerShake();
-                } else {
-                    items.splice(idx, 1);
-                    addPoints(10);
-                    playTone(680, 'sine', 0.08);
-                }
-            }
-        });
-    }
-    c.onmousemove = e => { if (e.buttons) addTrail(e.clientX, e.clientY); };
-    c.ontouchmove = e => { e.preventDefault(); addTrail(e.touches[0].clientX, e.touches[0].clientY); };
-
-    const loop = setInterval(() => {
-        if (!alive) return;
-        frame++;
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        if (frame % 35 === 0) {
-            items.push({
-                x: 50 + Math.random() * 260,
-                y: 440,
-                vx: (Math.random() - 0.5) * 4,
-                vy: -(11 + Math.random() * 3),
-                icon: icons[Math.floor(Math.random() * icons.length)]
-            });
-        }
-
-        ctx.font = '34px sans-serif';
-        ctx.textAlign = 'center';
-        items.forEach((it, i) => {
-            it.x += it.vx; it.y += it.vy; it.vy += 0.25;
-            ctx.fillText(it.icon, it.x, it.y);
-            if (it.y > 480) items.splice(i, 1);
-        });
-
-        trail.forEach((t, i) => {
-            t.life--;
-            ctx.fillStyle = `rgba(56, 189, 248, ${t.life / 10})`;
-            ctx.beginPath();
-            ctx.arc(t.x, t.y, t.life * 0.8, 0, Math.PI * 2);
-            ctx.fill();
-            if (t.life <= 0) trail.splice(i, 1);
-        });
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initOrbit(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let angle = 0, rocks = [], frame = 0, alive = true;
-
-    function aim(cx, cy) {
-        const r = c.getBoundingClientRect();
-        angle = Math.atan2((cy - r.top) - 220, (cx - r.left) - 180);
-    }
-    c.onmousemove = e => aim(e.clientX, e.clientY);
-    c.ontouchmove = e => aim(e.touches[0].clientX, e.touches[0].clientY);
-
-    const loop = setInterval(() => {
-        if (!alive) return;
-        frame++;
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        ctx.fillStyle = '#06b6d4';
-        ctx.beginPath();
-        ctx.arc(180, 220, 26, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 8;
-        ctx.beginPath();
-        ctx.arc(180, 220, 52, angle - 0.65, angle + 0.65);
-        ctx.stroke();
-
-        if (frame % 45 === 0) {
-            const a = Math.random() * Math.PI * 2;
-            rocks.push({ x: 180 + Math.cos(a) * 240, y: 220 + Math.sin(a) * 240, a });
-        }
-
-        rocks.forEach((rk, i) => {
-            rk.x -= Math.cos(rk.a) * 2.5;
-            rk.y -= Math.sin(rk.a) * 2.5;
-            ctx.fillStyle = '#f43f5e';
-            ctx.beginPath();
-            ctx.arc(rk.x, rk.y, 10, 0, Math.PI * 2);
-            ctx.fill();
-
-            const dist = Math.hypot(rk.x - 180, rk.y - 220);
-            if (dist < 58 && dist > 42) {
-                const ra = Math.atan2(rk.y - 220, rk.x - 180);
-                let diff = Math.abs(Math.atan2(Math.sin(ra - angle), Math.cos(ra - angle)));
-                if (diff < 0.75) {
-                    rocks.splice(i, 1);
-                    addPoints(10);
-                    playTone(580, 'sine', 0.08);
-                    return;
-                }
-            }
-            if (dist < 30) {
-                alive = false;
-                playTone(120, 'sawtooth', 0.4);
-                triggerShake();
-            }
-        });
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initCannon(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let aimAngle = -0.8, ball = null, target = { x: 270, y: 200 }, wind = 0;
-
-    function newTarget() {
-        target = { x: 180 + Math.random() * 140, y: 80 + Math.random() * 260 };
-        wind = (Math.random() - 0.5) * 0.12;
-    }
-    newTarget();
-
-    c.onmousemove = e => {
-        const r = c.getBoundingClientRect();
-        aimAngle = Math.atan2((e.clientY - r.top) - 400, (e.clientX - r.left) - 40);
-    };
-    c.onclick = () => {
-        if (!ball) {
-            ball = { x: 40, y: 400, vx: Math.cos(aimAngle) * 14, vy: Math.sin(aimAngle) * 14 };
-            playTone(300, 'triangle', 0.15);
-        }
-    };
-
-    const loop = setInterval(() => {
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(180, 20, wind * 600, 6);
-
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.arc(target.x, target.y, 20, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 12;
-        ctx.beginPath();
-        ctx.moveTo(40, 400);
-        ctx.lineTo(40 + Math.cos(aimAngle) * 35, 400 + Math.sin(aimAngle) * 35);
-        ctx.stroke();
-
-        if (ball) {
-            ball.vx += wind;
-            ball.vy += 0.35;
-    let cx = 0, cy = 0;
-    while (cx < cols - 1 || cy < rows - 1) {
-        walls[cy][cx] = 0;
-        if (cx < cols - 1 && (cy === rows - 1 || Math.random() > 0.5)) cx++;
-        else cy++;
-    }
-    walls[rows - 1][cols - 1] = 0;
-
-    function step(dx, dy) {
-        const nx = px + dx, ny = py + dy;
-        if (nx >= 0 && nx < cols && ny >= 0 && ny < rows && walls[ny][nx] === 0) {
-            px = nx; py = ny;
-            playTone(400, 'sine', 0.05);
-            if (px === cols - 1 && py === rows - 1) {
-                addPoints(50);
-                playTone(800, 'triangle', 0.3);
-                launchGame('maze');
-            }
-        }
-    }
-
-    const keyHandler = e => {
-        if (e.key === 'ArrowUp') step(0, -1);
-        if (e.key === 'ArrowDown') step(0, 1);
-        if (e.key === 'ArrowLeft') step(-1, 0);
-        if (e.key === 'ArrowRight') step(1, 0);
-    };
-    window.addEventListener('keydown', keyHandler);
-
-    c.onclick = e => {
-        const r = c.getBoundingClientRect();
-        const tx = e.clientX - r.left - (px * size + 20);
-        const ty = e.clientY - r.top - (py * size + 20);
-        if (Math.abs(tx) > Math.abs(ty)) step(tx > 0 ? 1 : -1, 0);
-        else step(0, ty > 0 ? 1 : -1);
-    };
-
-    const loop = setInterval(() => {
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        for (let y = 0; y < rows; y++) {
-            for (let x = 0; x < cols; x++) {
-                if (walls[y][x]) {
-                    ctx.fillStyle = '#334155';
-                    ctx.fillRect(x * size, y * size, size - 1, size - 1);
-                }
-            }
-        }
-
-        ctx.fillStyle = '#10b981';
-        ctx.fillRect((cols - 1) * size + 6, (rows - 1) * size + 6, size - 12, size - 12);
-
-        ctx.fillStyle = '#facc15';
-        ctx.beginPath();
-        ctx.arc(px * size + 20, py * size + 20, 12, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, 360, 440);
-        ctx.arc(px * size + 20, py * size + 20, 75, 0, Math.PI * 2, true);
-        ctx.fillStyle = '#030508';
-        ctx.fill();
-        ctx.restore();
-    }, 1000 / 30);
-
-    return () => {
-        clearInterval(loop);
-        window.removeEventListener('keydown', keyHandler);
-    };
-}
-
-function initStack(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let blocks = [{ x: 100, w: 160, y: 400, color: '#ec4899' }];
-    let cur = { x: 0, w: 160, y: 370, dir: 4 };
-    let alive = true;
-
-    function drop() {
-        if (!alive) return;
-        const prev = blocks[blocks.length - 1];
-        const overlap = Math.min(cur.x + cur.w, prev.x + prev.w) - Math.max(cur.x, prev.x);
-        if (overlap <= 0) {
-            alive = false;
-            playTone(130, 'sawtooth', 0.35);
-            triggerShake();
-            return;
-        }
-        const newX = Math.max(cur.x, prev.x);
-        const hue = (blocks.length * 25) % 360;
-        blocks.push({ x: newX, w: overlap, y: cur.y, color: `hsl(${hue}, 80%, 60%)` });
-        addPoints(10);
-        playTone(400 + blocks.length * 20, 'sine', 0.1);
-
-        if (blocks.length > 8) {
-            blocks.forEach(b => b.y += 30);
-        }
-        cur = { x: 0, w: overlap, y: blocks[blocks.length - 1].y - 30, dir: 4 + blocks.length * 0.2 };
-    }
-    c.onmousedown = drop;
-    c.ontouchstart = e => { e.preventDefault(); drop(); };
-
-    const loop = setInterval(() => {
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        blocks.forEach(b => {
-            ctx.fillStyle = b.color;
-            ctx.fillRect(b.x, b.y, b.w, 28);
-        });
-
-        if (alive) {
-            cur.x += cur.dir;
-            if (cur.x + cur.w > 360 || cur.x < 0) cur.dir *= -1;
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(cur.x, cur.y, cur.w, 28);
-        }
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
-
-function initPong(stage) {
-    stage.innerHTML = `<canvas id="c" width="360" height="440"></canvas>`;
-    const c = document.getElementById('c');
-    const ctx = c.getContext('2d');
-    let padX = 140, bx = 180, by = 220, vx = 3.5, vy = 4, alive = true;
-
-    function movePad(clientX) {
-        const r = c.getBoundingClientRect();
-        padX = Math.max(0, Math.min(280, (clientX - r.left) - 40));
-    }
-    c.onmousemove = e => movePad(e.clientX);
-    c.ontouchmove = e => movePad(e.touches[0].clientX);
-
-    const loop = setInterval(() => {
-        if (!alive) return;
-        ctx.fillStyle = '#060911';
-        ctx.fillRect(0, 0, 360, 440);
-
-        bx += vx; by += vy;
-        if (bx < 10 || bx > 350) { vx *= -1; playTone(300, 'sine', 0.05); }
-
-        ctx.fillStyle = '#14b8a6';
-        ctx.fillRect(padX, 20, 80, 12);
-        ctx.fillRect(padX, 408, 80, 12);
-
-        if (by <= 40 && bx >= padX && bx <= padX + 80) {
-            vy = Math.abs(vy) * 1.03;
-            addPoints(10);
-            playTone(520, 'triangle', 0.08);
-        }
-        if (by >= 400 && bx >= padX && bx <= padX + 80) {
-            vy = -Math.abs(vy) * 1.03;
-            addPoints(10);
-            playTone(520, 'triangle', 0.08);
-        }
-
-        if (by < 0 || by > 440) {
-            alive = false;
-            playTone(120, 'sawtooth', 0.4);
-            triggerShake();
-        }
-
-        ctx.fillStyle = '#facc15';
-        ctx.beginPath();
-        ctx.arc(bx, by, 10, 0, Math.PI * 2);
-        ctx.fill();
-    }, 1000 / 60);
-
-    return () => clearInterval(loop);
-}
+  };
+  document.querySelectorAll('#room button').forEach(b=>b.onclick=()=>hit[b.dataset.i]());
+  $('#ok').onclick=()=>{
+    if(st.box)return say('התיבה כבר פתוחה.');
+    if($('#code').value==='739'){st.box=st.key=1;say('התיבה נפתחה! מצאתם מפתח 🔑')}
+    else say('הקוד שגוי. נסו שוב.');
+  };
+  return null;
+};
+
+/* ---------- איפור ---------- */
+games.makeup=()=>{return null};
+const groups=[
+  ['שפתון',['#d6336c','#ff6b6b','#8e1b3a','#ff9ec4','#7a1fa2'],['lip']],
+  ['צללית',['#a58cff','#3cd3ff','#ffc93c','#ff4f8b','#2e8b57'],['s1','s2']],
+  ['סומק',['#ff8aa5','#ff6b4a','#d96ba0','#f4a261'],['b1','b2']],
+  ['שיער',['#4a2c17','#111111','#d9a441','#c0392b','#7b4fd6'],['hair']],
+  ['עור',['#f9dcc4','#f1c9a5','#d9a37a','#a8704a','#6b4429'],['face2','neck']]
+];
+const def={lip:'#d6336c',s1:'#a58cff',s2:'#a58cff',b1:'#ff8aa5',b2:'#ff8aa5',hair:'#4a2c17',face2:'#f1c9a5',neck:'#f1c9a5'};
+const paint=(ids,col)=>ids.forEach(i=>document.getElementById(i).setAttribute('fill',col));
+groups.forEach(([n,cols,ids])=>{
+  const r=document.createElement('div');r.className='row';
+  r.innerHTML='<b>'+n+'</b>';
+  cols.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='sw';b.style.background=c;b.setAttribute('aria-label',n+' '+c);
+    b.onclick=()=>paint(ids,c);r.appendChild(b);
+  });
+  $('#sw').appendChild(r);
+});
+$('#rnd').onclick=()=>groups.forEach(([n,cols,ids])=>paint(ids,cols[Math.random()*cols.length|0]));
+$('#rst').onclick=()=>Object.keys(def).forEach(i=>paint([i],def[i]));
 </script>
 </body>
 </html>
